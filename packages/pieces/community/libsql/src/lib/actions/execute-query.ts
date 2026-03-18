@@ -28,7 +28,7 @@ export default createAction({
     try {
       const result: ResultSet = await client.execute({
         sql: context.propsValue.query,
-        args: (context.propsValue.args as string[]) ?? [],
+        args: (context.propsValue.args as unknown[]) ?? [],
       });
       if (result.columns.length > 0) {
         // SELECT-style result: convert rows to plain objects
@@ -41,10 +41,8 @@ export default createAction({
         });
         return { results: rows };
       }
-      return {
-        rowsAffected: result.rowsAffected,
-        lastInsertRowid: result.lastInsertRowid?.toString() ?? null,
-      };
+      // Return raw libSQL metadata (e.g., rowsAffected and lastInsertRowid).
+      return result;
     } finally {
       client.close();
     }

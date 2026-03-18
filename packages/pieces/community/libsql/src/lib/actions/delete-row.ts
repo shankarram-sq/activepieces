@@ -37,9 +37,8 @@ export default createAction({
         sql,
         args: [context.propsValue.search_value],
       });
-      return {
-        rowsAffected: result.rowsAffected,
-      };
+      // Return raw libSQL metadata (e.g., rowsAffected and lastInsertRowid).
+      return result;
     } finally {
       client.close();
     }

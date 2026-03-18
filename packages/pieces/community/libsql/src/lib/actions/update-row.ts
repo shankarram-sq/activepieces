@@ -32,13 +32,12 @@ export default createAction({
     const client = libsqlConnect(context.auth);
     try {
       const args = [
-        ...fields.map((f) => context.propsValue.values[f] as string),
+        ...fields.map((f) => context.propsValue.values[f]),
         context.propsValue.search_value,
       ];
       const result = await client.execute({ sql, args });
-      return {
-        rowsAffected: result.rowsAffected,
-      };
+      // Return raw libSQL metadata (e.g., rowsAffected and lastInsertRowid).
+      return result;
     } finally {
       client.close();
     }

@@ -19,7 +19,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 function sanitizeColumnName(name: string | undefined): string {
   if (name === '*') return name;
-  return `"${(name ?? '').replace(/"/g, '""')}"`;
+  if (!name) {
+    throw new Error('Column or table name is required.');
+  }
+  return `"${name.replace(/"/g, '""')}"`;
 }
 
 function libsqlConnect(url: string, authToken?: string): Client {
@@ -49,10 +52,7 @@ async function executeQuery(
     });
     return { results: rows };
   }
-  return {
-    rowsAffected: result.rowsAffected,
-    lastInsertRowid: result.lastInsertRowid?.toString() ?? null,
-  };
+  return result as unknown as Record<string, unknown>;
 }
 
 async function insertRow(
@@ -68,10 +68,7 @@ async function insertRow(
     sql,
     args: fields.map((f) => values[f]) as never,
   });
-  return {
-    rowsAffected: result.rowsAffected,
-    lastInsertRowid: result.lastInsertRowid?.toString() ?? null,
-  };
+  return result;
 }
 
 async function findRows(
@@ -110,7 +107,7 @@ async function updateRow(
   const sql = `UPDATE ${sanitizeColumnName(table)} SET ${qsSet} WHERE ${sanitizeColumnName(searchColumn)} = ?;`;
   const args = [...fields.map((f) => values[f]), searchValue];
   const result = await client.execute({ sql, args: args as never });
-  return { rowsAffected: result.rowsAffected };
+  return result;
 }
 
 async function deleteRow(
@@ -124,7 +121,7 @@ async function deleteRow(
     sql,
     args: [searchValue] as never,
   });
-  return { rowsAffected: result.rowsAffected };
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,8 +162,10 @@ describe('libsql piece – in-memory SQLite database (local)', () => {
     expect(sanitizeColumnName('my"col')).toBe('"my""col"');
   });
 
-  it('sanitizeColumnName handles undefined gracefully', () => {
-    expect(sanitizeColumnName(undefined)).toBe('""');
+  it('sanitizeColumnName throws on undefined identifiers', () => {
+    expect(() => sanitizeColumnName(undefined)).toThrow(
+      'Column or table name is required.'
+    );
   });
 
   // --- get tables ---------------------------------------------------------
@@ -186,7 +185,7 @@ describe('libsql piece – in-memory SQLite database (local)', () => {
       age: 30,
     });
     expect(result.rowsAffected).toBe(1);
-    expect(result.lastInsertRowid).toBe('1');
+    expect(result.lastInsertRowid?.toString()).toBe('1');
   });
 
   it('insert row adds a second record', async () => {
@@ -196,7 +195,7 @@ describe('libsql piece – in-memory SQLite database (local)', () => {
       age: 25,
     });
     expect(result.rowsAffected).toBe(1);
-    expect(result.lastInsertRowid).toBe('2');
+    expect(result.lastInsertRowid?.toString()).toBe('2');
   });
 
   // --- find rows ----------------------------------------------------------
@@ -265,7 +264,7 @@ describe('libsql piece – in-memory SQLite database (local)', () => {
       client,
       'INSERT INTO products (title) VALUES (?)',
       ['Widget']
-    )) as { rowsAffected: number; lastInsertRowid: string };
+    )) as { rowsAffected: number; lastInsertRowid?: bigint };
     expect(result.rowsAffected).toBe(1);
     expect(result.lastInsertRowid).toBeDefined();
   });

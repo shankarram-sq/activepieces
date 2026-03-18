@@ -69,6 +69,9 @@ export function sanitizeColumnName(name: string | undefined): string {
   if (name === '*') {
     return name;
   }
+  if (!name) {
+    throw new Error('Column or table name is required.');
+  }
   // Escape any double-quotes inside the identifier, then wrap in double-quotes
-  return `"${(name ?? '').replace(/"/g, '""')}"`;
+  return `"${name.replace(/"/g, '""')}"`;
 }

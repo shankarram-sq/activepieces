@@ -22,12 +22,10 @@ export default createAction({
 
     const client = libsqlConnect(context.auth);
     try {
-      const args = fields.map((f) => context.propsValue.values[f] as string);
+      const args = fields.map((f) => context.propsValue.values[f]);
       const result = await client.execute({ sql, args });
-      return {
-        rowsAffected: result.rowsAffected,
-        lastInsertRowid: result.lastInsertRowid?.toString() ?? null,
-      };
+      // Return raw libSQL metadata (e.g., rowsAffected and lastInsertRowid).
+      return result;
     } finally {
       client.close();
     }
