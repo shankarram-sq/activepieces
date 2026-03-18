@@ -25,18 +25,27 @@ function sanitizeColumnName(name: string | undefined): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-type AuthShape = {
-  url?: string;
-  authToken?: string;
-  props?: { url?: string; authToken?: string };
-};
-
-function libsqlConnect(auth: string | AuthShape): Client {
+function libsqlConnect(
+  auth: string | Record<string, unknown>
+): Client {
   const normalizedAuth = typeof auth === 'string' ? { props: { url: auth } } : auth;
-  const url = (normalizedAuth.props?.url ?? normalizedAuth.url ?? '').trim();
+  const props =
+    normalizedAuth['props'] && typeof normalizedAuth['props'] === 'object'
+      ? (normalizedAuth['props'] as Record<string, unknown>)
+      : undefined;
+  const url = (
+    (typeof props?.['url'] === 'string' ? props['url'] : undefined) ??
+    (typeof normalizedAuth['url'] === 'string' ? normalizedAuth['url'] : undefined) ??
+    ''
+  ).trim();
   const authToken =
-    (normalizedAuth.props?.authToken ?? normalizedAuth.authToken ?? undefined)?.trim() ||
-    undefined;
+    (
+      (typeof props?.['authToken'] === 'string' ? props['authToken'] : undefined) ??
+      (typeof normalizedAuth['authToken'] === 'string'
+        ? normalizedAuth['authToken']
+        : undefined) ??
+      undefined
+    )?.trim() || undefined;
   return createClient({ url, authToken });
 }
 
