@@ -25,15 +25,26 @@ function sanitizeColumnName(name: string | undefined): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-function libsqlConnect(url: string, authToken?: string): Client {
-  return createClient({ url, authToken: authToken || undefined });
+type AuthShape = {
+  url?: string;
+  authToken?: string;
+  props?: { url?: string; authToken?: string };
+};
+
+function libsqlConnect(auth: string | AuthShape): Client {
+  const normalizedAuth = typeof auth === 'string' ? { props: { url: auth } } : auth;
+  const url = (normalizedAuth.props?.url ?? normalizedAuth.url ?? '').trim();
+  const authToken =
+    (normalizedAuth.props?.authToken ?? normalizedAuth.authToken ?? undefined)?.trim() ||
+    undefined;
+  return createClient({ url, authToken });
 }
 
 async function libsqlGetTableNames(client: Client): Promise<string[]> {
   const result = await client.execute(
     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
   );
-  return result.rows.map((row) => row[0] as string);
+  return result.rows.map((row) => (row['name'] as string) ?? (row[0] as string));
 }
 
 async function executeQuery(
@@ -174,6 +185,26 @@ describe('libsql piece – in-memory SQLite database (local)', () => {
     const tables = await libsqlGetTableNames(client);
     expect(Array.isArray(tables)).toBe(true);
     expect(tables).toContain('users');
+  });
+
+  it('libsqlConnect supports top-level auth shape', async () => {
+    const topLevelClient = libsqlConnect({ url: ':memory:' });
+    try {
+      const result = await topLevelClient.execute('SELECT 1 as ok;');
+      expect(result.rows[0]['ok']).toBe(1);
+    } finally {
+      topLevelClient.close();
+    }
+  });
+
+  it('libsqlConnect supports nested props auth shape', async () => {
+    const propsClient = libsqlConnect({ props: { url: ':memory:' } });
+    try {
+      const result = await propsClient.execute('SELECT 1 as ok;');
+      expect(result.rows[0]['ok']).toBe(1);
+    } finally {
+      propsClient.close();
+    }
   });
 
   // --- insert row ---------------------------------------------------------

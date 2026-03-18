@@ -15,8 +15,20 @@ export const warningMarkdown = Property.MarkDown({
 export function libsqlConnect(
   auth: AppConnectionValueForAuthProperty<typeof libsqlAuth>
 ): Client {
-  const url = (auth.props.url as string).trim();
-  const authToken = (auth.props.authToken as string | undefined)?.trim() || undefined;
+  const authWithFallback = auth as
+    | AppConnectionValueForAuthProperty<typeof libsqlAuth>
+    | { url?: string; authToken?: string };
+  const url = (
+    authWithFallback.props?.url ??
+    authWithFallback.url ??
+    ''
+  ).trim();
+  const authToken =
+    (
+      authWithFallback.props?.authToken ??
+      authWithFallback.authToken ??
+      undefined
+    )?.trim() || undefined;
   return createClient({ url, authToken });
 }
 
@@ -24,7 +36,7 @@ export async function libsqlGetTableNames(client: Client): Promise<string[]> {
   const result = await client.execute(
     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;"
   );
-  return result.rows.map((row) => row[0] as string);
+  return result.rows.map((row) => (row['name'] as string) ?? (row[0] as string));
 }
 
 export const libsqlCommon = {
