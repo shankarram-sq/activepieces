@@ -1,5 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { vi, describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@libsql/client';
+
+// Mock sqliteConnect to bypass the file: URL security check so integration
+// tests can use a local test DB while still exercising action logic.
+vi.mock('../common', async () => {
+  const mod = await vi.importActual<typeof import('../common')>('../common');
+  return {
+    ...mod,
+    sqliteConnect: async (auth: any) => {
+      const url = auth?.url || auth?.props?.url;
+      const authToken = auth?.authToken || auth?.props?.authToken;
+      return createClient({ url, authToken: authToken || undefined });
+    },
+  };
+});
+
 import insertRow from '../insert-row';
 import findRows from '../find-rows';
 import updateRow from '../update-row';
@@ -153,5 +168,59 @@ describe('SQLite Piece End-to-End', () => {
     };
     const findResult = await findRows.run(findContext as any);
     expect(findResult.results.length).toBe(0);
+  });
+
+  it('should insert a row using DEFAULT VALUES when no fields are provided', async () => {
+    // Create a separate table that uses all defaults
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+
+    const context = {
+      auth: mockAuth,
+      propsValue: {
+        table: 'logs',
+        values: {},
+      },
+    };
+
+    const result = await insertRow.run(context as any);
+    expect(result.rowsAffected).toBe(1);
+  });
+
+  it('should execute a query with named parameters', async () => {
+    const context = {
+      auth: mockAuth,
+      propsValue: {
+        query: 'SELECT * FROM users WHERE email = :email',
+        args: [],
+        namedArgs: { email: 'john@example.com' },
+      },
+    };
+
+    // Insert a fresh row for this test
+    await client.execute(`INSERT INTO users (name, email) VALUES ('Named Test', 'john@example.com') ON CONFLICT(email) DO NOTHING;`);
+
+    const result = await executeQuery.run(context as any);
+    expect(Array.isArray(result.results)).toBe(true);
+  });
+});
+
+describe('sqliteConnect URL security', () => {
+  it('should reject file: URLs', async () => {
+    const { sqliteConnect } = await vi.importActual<typeof import('../common')>('../common');
+    await expect(sqliteConnect({ url: 'file:/etc/passwd' })).rejects.toThrow(
+      'Local file: URLs are not permitted'
+    );
+  });
+
+  it('should reject file: URLs case-insensitively', async () => {
+    const { sqliteConnect } = await vi.importActual<typeof import('../common')>('../common');
+    await expect(sqliteConnect({ url: 'FILE:database.db' })).rejects.toThrow(
+      'Local file: URLs are not permitted'
+    );
   });
 });

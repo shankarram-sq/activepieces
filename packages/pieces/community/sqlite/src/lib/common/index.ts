@@ -1,5 +1,4 @@
 import {
-  PiecePropValueSchema,
   Property,
 } from '@activepieces/pieces-framework';
 import { createClient, Client } from '@libsql/client';
@@ -14,8 +13,14 @@ export const warningMarkdown = Property.MarkDown({
 export async function sqliteConnect(
   auth: any
 ): Promise<Client> {
-  const url = auth?.url || auth?.props?.url;
+  const url = (auth?.url || auth?.props?.url || '') as string;
   const authToken = auth?.authToken || auth?.props?.authToken;
+
+  if (/^file:/i.test(url.trim())) {
+    throw new Error(
+      'Local file: URLs are not permitted. Use a remote libSQL/Turso URL (libsql:// or https://) instead.'
+    );
+  }
 
   const client = createClient({
     url: url,
