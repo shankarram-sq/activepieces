@@ -15,28 +15,17 @@ export default createAction({
       required: true,
     }),
     args: Property.Array({
-      displayName: 'Positional Arguments',
-      description: 'Positional arguments for ? placeholders, in order.',
-      required: false,
-    }),
-    namedArgs: Property.Object({
-      displayName: 'Named Arguments',
-      description: 'Named arguments for :name, @name, or $name placeholders. When provided, Positional Arguments is ignored.',
+      displayName: 'Arguments',
+      description: 'Arguments to use in the query, if any. Should be in the same order as the ? in the query string.',
       required: false,
     }),
   },
   async run(context) {
-    const namedArgs = context.propsValue.namedArgs as Record<string, unknown> | undefined;
-    const hasNamedArgs = namedArgs && Object.keys(namedArgs).length > 0;
-    const args = hasNamedArgs
-      ? (namedArgs as Record<string, unknown>)
-      : ((context.propsValue.args as unknown[]) || []);
-
     const conn = await sqliteConnect(context.auth);
     try {
       const results = await conn.execute({
         sql: context.propsValue.query,
-        args: args as any,
+        args: (context.propsValue.args as any[]) || []
       });
       if (results.columns.length > 0) {
         const rows = results.rows.map((row) => {

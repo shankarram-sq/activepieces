@@ -1,5 +1,5 @@
 import { createAction, Property } from '@activepieces/pieces-framework';
-import { sqliteCommon, sqliteConnect, sanitizeColumnName } from '../common';
+import { sqliteCommon, sqliteConnect, sanitizeColumnName, warningMarkdown } from '../common';
 import { sqliteAuth } from '../../auth';
 
 export default createAction({
@@ -16,25 +16,16 @@ export default createAction({
   },
   async run(context) {
     const fields = Object.keys(context.propsValue.values);
-
-    let qs: string;
-    let values: unknown[];
-
-    if (fields.length === 0) {
-      qs = `INSERT INTO ${sanitizeColumnName(context.propsValue.table)} DEFAULT VALUES;`;
-      values = [];
-    } else {
-      const qsFields = fields.map((f) => sanitizeColumnName(f)).join(',');
-      const qsValues = fields.map(() => '?').join(',');
-      qs = `INSERT INTO ${sanitizeColumnName(context.propsValue.table)} (${qsFields}) VALUES (${qsValues});`;
-      values = fields.map((f) => context.propsValue.values[f]);
-    }
+    const qsFields = fields.map((f) => sanitizeColumnName(f)).join(',');
+    const qsValues = fields.map(() => '?').join(',');
+    const qs = `INSERT INTO ${sanitizeColumnName(context.propsValue.table)} (${qsFields}) VALUES (${qsValues});`;
 
     const conn = await sqliteConnect(context.auth);
     try {
+      const values = fields.map((f) => context.propsValue.values[f]);
       const result = await conn.execute({
         sql: qs,
-        args: values as any[],
+        args: values as any[]
       });
       return {
         rowsAffected: result.rowsAffected,
